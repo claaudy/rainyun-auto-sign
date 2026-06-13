@@ -832,6 +832,45 @@ def solve_captcha_with_minimal_runtime(context: BrowserContext) -> dict[str, Any
     raise SignInError(f"最小验证码运行时连续失败 {CAPTCHA_VERIFY_MAX_ATTEMPTS} 次: {last_error}")
 
 
+def refresh_csrf_token(page: Page) -> str:
+    """Re-fetch CSRF token from API and re-set it as cookie."""
+    csrf_value = ""
+    csrf_resp: Any = None
+    for attempt in range(1, 6):
+        csrf_resp = auth_fetch(page, USER_CSRF_API, "GET")
+        candidate = csrf_resp.get("data") if isinstance(csrf_resp, dict) else csrf_resp
+        if isinstance(candidate, str) and candidate:
+            csrf_value = candidate
+            break
+        log_stage("csrf:refresh:retry", attempt=attempt, response=csrf_resp)
+        page.wait_for_timeout(300)
+    if not csrf_value:
+        log_stage("csrf:refresh:failed", response=csrf_resp)
+        return ""
+    page.context.add_cookies(
+        [
+            {
+                "name": "X-CSRF-Token",
+                "value": urllib.parse.quote(csrf_value, safe=""),
+                "domain": ".rainyun.com",
+                "path": "/",
+                "httpOnly": False,
+                "secure": True,
+                "sameSite": "None",
+            }
+        ]
+    )
+    # Verify cookie is readable
+    ready = ""
+    for _ in range(5):
+        ready = get_cookie_value(page, page.url, "X-CSRF-Token")
+        if ready:
+            break
+        page.wait_for_timeout(200)
+    log_stage("csrf:refresh:done", ok=bool(ready))
+    return ready
+
+
 def perform_signin(page: Page) -> dict[str, Any]:
     log_stage("signin:start", url=page.url)
     daily = get_daily_task(page)
@@ -840,6 +879,10 @@ def perform_signin(page: Page) -> dict[str, Any]:
         return {"status": "already_done", "task": daily}
     if daily.get("Status") not in (1, "1"):
         raise SignInError(f"每日签到当前不是可领取状态: {daily}")
+
+    # Refresh CSRF token before captcha — earlier navigations may have lost it
+    refreshed_csrf = refresh_csrf_token(page)
+    log_stage("signin:csrf_refreshed", ok=bool(refreshed_csrf))
 
     log_stage("signin:captcha:start")
     captcha_result = solve_captcha_with_minimal_runtime(page.context)
