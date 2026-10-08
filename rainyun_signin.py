@@ -591,20 +591,54 @@ def list_context_cookie_names(page: Page, urls: list[str] | None = None) -> list
 
 
 def get_cookie_value(page: Page, url: str, name: str) -> str:
-    cookie = page.evaluate(
-        """
-        ({name}) => {
-          const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]+)`));
-          return match ? decodeURIComponent(match[1]) : '';
-        }
-        """,
-        {"name": name},
-    )
+    """Read a cookie without depending on the JS execution context.
+
+    ``page.context.cookies()`` is served over the CDP cookie store and stays
+    valid while a navigation is tearing the old document down, whereas
+    ``page.evaluate()`` requires a live execution context and raises
+    ``Error: Execution context was destroyed`` mid-navigation -- the exact
+    failure that crashed the run on 2026-10-08.
+
+    The CDP path is therefore tried first. ``page.evaluate()`` is kept as a
+    fallback, but a destroyed context there is no longer fatal: we fall back
+    to the CDP result instead of propagating the error.
+    """
+    candidates = [url, page.url]
+
+    def from_cookie_jar() -> str:
+        for item in page.context.cookies(candidates):
+            if item.get("name") == name:
+                return urllib.parse.unquote(item.get("value", ""))
+        return ""
+
+    # Primary path: survives navigations because it never touches the DOM.
+    cookie = from_cookie_jar()
     if cookie:
         return cookie
-    for item in page.context.cookies([url, page.url]):
-        if item.get("name") == name:
-            return urllib.parse.unquote(item.get("value", ""))
+
+    # Fallback: document.cookie can see cookies the CDP layer hides.
+    try:
+        cookie = page.evaluate(
+            """
+            ({name}) => {
+              const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]+)`));
+              return match ? decodeURIComponent(match[1]) : '';
+            }
+            """,
+            {
+                "name": name,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 - navigation destroyed the execution context
+        log_stage(
+            "cookie:evaluate:unavailable",
+            name=name,
+            error=str(exc),
+            exc_type=type(exc).__name__,
+        )
+        return ""
+    if cookie:
+        return cookie
     return ""
 
 
@@ -1011,6 +1045,22 @@ def run_multi_signin_mode(env_dir: Path, headless: bool) -> int:
                             "username": username,
                             "status": "error",
                             "error": str(exc),
+                        }
+                    )
+                except Exception as exc:  # noqa: BLE001 - one account must not abort the loop
+                    failed += 1
+                    log_stage(
+                        "account:error",
+                        username=username,
+                        error=str(exc),
+                        exc_type=type(exc).__name__,
+                    )
+                    results.append(
+                        {
+                            "account_file": str(env_path),
+                            "username": username,
+                            "status": "error",
+                            "error": f"{type(exc).__name__}: {exc}",
                         }
                     )
         finally:
