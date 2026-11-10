@@ -579,10 +579,13 @@ def login_via_protocol(page: Page, creds: Credentials) -> None:
 
 
 def build_rys_header(page: Page) -> str:
-    page.wait_for_function("() => typeof window.fea === 'string' && window.fea.length > 0", timeout=DEFAULT_TIMEOUT_MS)
-    fea = page.evaluate("() => window.fea")
-    timestamp = f"{int(time.time() * 1000) / 1000:.3f}"
-    return f"{fea}{timestamp}"
+    page.wait_for_function(
+        """() => (typeof window.fea === 'string' && window.fea.length > 0)
+            || (typeof window.fea === 'number' && Number.isFinite(window.fea))""",
+        timeout=DEFAULT_TIMEOUT_MS,
+    )
+    # Match the frontend: numbers are added, strings are concatenated.
+    return page.evaluate("() => String(window.fea + Date.now() / 1000)")
 
 
 def list_context_cookie_names(page: Page, urls: list[str] | None = None) -> list[str]:
