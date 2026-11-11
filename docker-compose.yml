@@ -1,7 +1,23 @@
+# Build-only runtime image, NOT an account controller or a scheduled service.
+# Build: docker compose --profile build-only build rainyun-worker
+# The host-root Python CLI creates the credential-free isolated workers itself.
 services:
-  rainyun-signin:
-    build: .
-    volumes:
-      - ./accounts:/app/accounts:ro
-    environment:
-      - TZ=Asia/Shanghai
+  rainyun-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: signin-rainyun-http-worker:takeover
+    profiles: ["build-only"]
+    entrypoint: ["python3", "-c"]
+    command: ["raise SystemExit('Build-only worker image; run rainyun_signin.py as root on the host, not in this container.')"]
+    restart: "no"
+    network_mode: none
+    read_only: true
+    user: "65534:65534"
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: 256m
+    cpus: 1.0
+    logging:
+      driver: none

@@ -1,23 +1,65 @@
-# Python
+# Host-only credentials and per-run private workspace; never commit these.
+.runtime/
+accounts/
+.env
+.env.*
+*.env
+
+# Python environments, caches and coverage.
 .venv/
+venv/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+.cache/
+cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 
-# Environment
-.env
-.env.*
-accounts/
+# Local verification and test output, not release source.
+.release-evidence/
+*.log
+*.out
+test-results*
+test-output*
+verification.json
 
-# IDE
+# Downloaded CAPTCHA inputs, generated proofs and acceptance evidence.
+proofs/
+captcha/
+captcha-*/
+captcha_*/
+screenshots/
+*captcha*.json
+*captcha*.png
+*captcha*.jpg
+*captcha*.webp
+*proof*.json
+*proof*.txt
+*proof*.bin
+*collect*.json
+*collect*.txt
+*ticket*.json
+*sess*.json
+background.png
+sprite.png
+layout.json
+tdc.js
+tdc-*.js
+frontend-*.js
+
+# IDE / OS.
 .vscode/
 .idea/
-
-# OS
 .DS_Store
 Thumbs.db
 
-# TenVision
+# Retain the old vendored-tree ignore rules without reviving its runtime.
 TenVision/.git/
 TenVision/.venv/
 TenVision/__pycache__/
