@@ -8,7 +8,6 @@
 - 宿主机 PID1 必须是 systemd，并提供可用的 `/usr/bin/systemd-run`、`/usr/bin/systemctl`、`/usr/bin/docker` 和 Docker daemon。控制器会为每个 worker 注册 root 系统管理器持有的独立清理计时器；这些临时清理单元不是签到调度任务。
 - Node/CV 是不持有账号的隔离 Docker worker，只有公开验证码素材和只读脚本挂载。**禁止把宿主机控制器塞进持有账号的容器，再授予 privileged、Docker socket、systemd/D-Bus 或宿主机运行目录挂载。**
 - 安装目录、源码及 `.runtime/` 必须归 root 所有，不可由其他用户修改。账号文件仅留在宿主机私有目录（目录 0700、文件 0600），不得加入仓库、构建上下文白名单、镜像或 worker 挂载。
-- `pyproject.toml` / `uv.lock` 是保留的旧版依赖元数据，不用于新的宿主机标准库路径，也不用于 worker 构建；本次适配不修改它们。
 
 安装时将以下运行文件放在同一目录：
 
