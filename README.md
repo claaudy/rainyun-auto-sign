@@ -99,6 +99,8 @@ password="你的密码"
 
 ## 离线测试与发布验收边界
 
+GitHub Actions 在每次 push 和 pull request 时运行这套离线测试，跳过真实 Docker/systemd 集成用例，不登录雨云、不签到，也不需要账号或 API 密钥。
+
 在仓库根目录运行纯本地测试，明确关闭集成开关：
 
 ```sh
